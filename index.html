@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#08111f" />
+  <title>Octave Atlas · Geometric Fretboard Practice</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+          colors: { ink: '#08111f', panel: '#101c2d', line: '#26364d', cyan: '#50d7ff', lime: '#b6f36b' }
+        }
+      }
+    };
+  </script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #08111f;
+      --panel: #101c2d;
+      --panel-2: #0d1828;
+      --panel-3: #16263a;
+      --line: #26364d;
+      --line-strong: #3f5572;
+      --text: #edf5ff;
+      --muted: #91a4bd;
+      --blue: #58c7ff;
+      --blue-deep: #2387ff;
+      --green: #b9f56f;
+      --green-deep: #48c68f;
+      --red: #ff7782;
+      --orange: #ffbf69;
+      --cell-width: 54px;
+      --row-height: 57px;
+    }
+
+    * { box-sizing: border-box; }
+    html { background: var(--bg); }
+    body {
+      min-width: 320px;
+      margin: 0;
+      background:
+        radial-gradient(circle at 18% -10%, rgba(44, 110, 183, .25), transparent 33rem),
+        radial-gradient(circle at 100% 8%, rgba(36, 171, 170, .12), transparent 26rem),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button, select { font: inherit; }
+    button:focus-visible, select:focus-visible { outline: 3px solid rgba(80, 215, 255, .7); outline-offset: 2px; }
+
+    .app-shell { max-width: 1500px; margin: 0 auto; padding: 28px clamp(16px, 3vw, 42px) 48px; }
+    .eyebrow { color: var(--blue); text-transform: uppercase; font-size: .7rem; font-weight: 800; letter-spacing: .16em; }
+    .hero-title { font-size: clamp(2.1rem, 5vw, 4.3rem); line-height: .98; letter-spacing: -.055em; font-weight: 850; }
+    .hero-copy { color: var(--muted); max-width: 650px; line-height: 1.65; font-size: .98rem; }
+    .glass-panel {
+      background: linear-gradient(145deg, rgba(19, 34, 54, .95), rgba(9, 19, 33, .97));
+      border: 1px solid rgba(107, 147, 190, .22);
+      box-shadow: 0 18px 60px rgba(0, 0, 0, .22), inset 0 1px rgba(255,255,255,.035);
+      border-radius: 24px;
+    }
+    .control-panel { padding: clamp(18px, 2.3vw, 30px); }
+    .panel-kicker { color: var(--muted); font-size: .72rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+    .field-label { display: block; margin-bottom: 8px; color: #c8d7e9; font-size: .77rem; font-weight: 750; }
+    .select-wrap { position: relative; }
+    .select-wrap::after { content: '⌄'; position: absolute; right: 14px; top: 50%; transform: translateY(-54%); color: var(--blue); pointer-events: none; font-size: 1rem; }
+    .control-select {
+      appearance: none;
+      width: 100%; min-height: 46px; padding: 0 40px 0 13px;
+      color: var(--text); background: rgba(8, 17, 31, .75);
+      border: 1px solid var(--line-strong); border-radius: 12px;
+      cursor: pointer; transition: border-color .2s, box-shadow .2s;
+    }
+    .control-select:hover { border-color: var(--blue); }
+    .mode-toggle { display: inline-flex; padding: 4px; gap: 4px; border-radius: 14px; background: rgba(5, 12, 23, .7); border: 1px solid var(--line); }
+    .mode-btn { border: 0; border-radius: 10px; color: var(--muted); background: transparent; padding: 10px 15px; font-size: .83rem; font-weight: 800; cursor: pointer; transition: background .2s, color .2s, transform .2s; }
+    .mode-btn:hover { color: var(--text); }
+    .mode-btn[aria-pressed="true"] { color: #03101f; background: var(--blue); box-shadow: 0 5px 18px rgba(80, 215, 255, .25); }
+    .rule-box { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border-radius: 14px; background: rgba(80, 215, 255, .07); border: 1px solid rgba(80, 215, 255, .2); color: #d4e9fa; line-height: 1.5; font-size: .82rem; }
+    .rule-icon { flex: 0 0 auto; width: 27px; height: 27px; display: grid; place-items: center; border-radius: 9px; color: #03101f; background: var(--blue); font-weight: 900; }
+    .practice-box { display: none; }
+    .practice-box.is-visible { display: block; }
+    .score-chip { display: inline-flex; align-items: baseline; gap: 6px; padding: 7px 10px; border-radius: 10px; background: rgba(185,245,111,.08); border: 1px solid rgba(185,245,111,.2); }
+    .score-number { color: var(--green); font-size: 1.05rem; font-weight: 850; }
+    .score-label { color: var(--muted); font-size: .7rem; font-weight: 750; text-transform: uppercase; letter-spacing: .08em; }
+    .status-line { min-height: 23px; color: var(--muted); font-size: .79rem; }
+    .status-line[data-tone="good"] { color: var(--green); }
+    .status-line[data-tone="bad"] { color: var(--red); }
+    .status-line[data-tone="info"] { color: var(--blue); }
+    .round-btn { width: 100%; border: 1px solid rgba(185,245,111,.35); background: rgba(185,245,111,.12); color: var(--green); border-radius: 11px; padding: 10px 12px; font-size: .8rem; font-weight: 800; cursor: pointer; transition: background .2s, transform .2s; }
+    .round-btn:hover { background: rgba(185,245,111,.2); transform: translateY(-1px); }
+    .board-card { padding: clamp(16px, 2vw, 26px); overflow: hidden; }
+    .board-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+    .board-title { font-size: 1.2rem; font-weight: 850; letter-spacing: -.02em; }
+    .board-subtitle { color: var(--muted); font-size: .76rem; line-height: 1.4; }
+    .legend { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 14px; color: var(--muted); font-size: .7rem; white-space: nowrap; }
+    .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+    .legend-dot { width: 11px; height: 11px; border-radius: 999px; display: inline-block; }
+    .legend-dot.anchor { background: var(--blue); box-shadow: 0 0 12px rgba(88,199,255,.65); }
+    .legend-dot.octave { background: var(--green); box-shadow: 0 0 12px rgba(185,245,111,.5); }
+    .legend-line { width: 21px; border-top: 2px dashed #83a9c6; display: inline-block; }
+    .board-scroll { overflow-x: auto; overflow-y: hidden; border-radius: 16px; border: 1px solid rgba(107, 147, 190, .22); background: #0a1422; scrollbar-color: #2b4a68 #0a1422; }
+    .board-scroll::-webkit-scrollbar { height: 10px; }
+    .board-scroll::-webkit-scrollbar-track { background: #0a1422; }
+    .board-scroll::-webkit-scrollbar-thumb { background: #2b4a68; border-radius: 10px; }
+    .board-canvas { position: relative; width: max-content; min-width: 974px; padding: 18px 18px 20px; }
+    .fret-grid { position: relative; z-index: 2; display: grid; grid-template-columns: 77px repeat(16, var(--cell-width)); grid-template-rows: 33px repeat(6, var(--row-height)); }
+    .grid-corner { display: flex; align-items: center; padding-left: 10px; color: #607993; font-size: .62rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .fret-head { display: grid; place-items: center; position: relative; color: #7890aa; font-size: .67rem; font-weight: 800; }
+    .fret-head::after { content: ''; position: absolute; inset: 0 0 0 0; border-left: 1px solid rgba(129, 159, 190, .1); pointer-events: none; }
+    .fret-head[data-marker="single"]::before, .fret-head[data-marker="double"]::before, .fret-head[data-marker="double"]::after { content: ''; position: absolute; width: 7px; height: 7px; border-radius: 50%; background: #47617d; bottom: -13px; z-index: 1; }
+    .fret-head[data-marker="single"]::before { left: 50%; transform: translateX(-50%); }
+    .fret-head[data-marker="double"]::before { left: calc(50% - 9px); }
+    .fret-head[data-marker="double"]::after { left: calc(50% + 2px); }
+    .string-label { display: flex; align-items: center; gap: 8px; padding-left: 10px; color: #d7e6f5; font-size: .77rem; font-weight: 800; border-top: 1px solid rgba(125, 161, 195, .14); }
+    .string-label small { color: #7189a3; font-size: .62rem; font-weight: 700; }
+    .fret-cell { position: relative; display: grid; place-items: center; min-width: 0; min-height: 0; padding: 0; border: 0; border-left: 1px solid rgba(124, 153, 184, .21); border-top: 1px solid rgba(125, 161, 195, .14); color: var(--muted); background: transparent; cursor: pointer; }
+    .fret-cell::before { content: ''; position: absolute; left: 0; right: 0; top: calc(50% - 1px); height: 2px; background: rgba(183, 201, 219, .34); z-index: -1; pointer-events: none; }
+    .fret-cell:hover { background: rgba(80, 215, 255, .08); }
+    .fret-cell[data-fret="0"] { border-left: 3px solid #7891ad; }
+    .fret-cell[data-fret="0"]::before { background: rgba(183, 201, 219, .55); }
+    .cell-marker { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 999px; position: relative; z-index: 3; font-size: .7rem; font-weight: 850; letter-spacing: -.02em; transition: transform .18s, box-shadow .18s, background .18s, border-color .18s; }
+    .cell-marker.is-anchor { background: radial-gradient(circle at 35% 30%, #a9ebff, var(--blue-deep) 72%); color: #041322; box-shadow: 0 0 0 3px rgba(88,199,255,.17), 0 0 24px rgba(88,199,255,.55); }
+    .cell-marker.is-octave { background: radial-gradient(circle at 35% 30%, #e5ffc1, var(--green-deep) 75%); color: #071a1d; box-shadow: 0 0 0 3px rgba(185,245,111,.1), 0 0 18px rgba(185,245,111,.34); }
+    .cell-marker.is-found { background: radial-gradient(circle at 35% 30%, #e5ffc1, var(--green-deep) 75%); color: #071a1d; box-shadow: 0 0 0 3px rgba(185,245,111,.1), 0 0 18px rgba(185,245,111,.34); }
+    .cell-marker.is-selected { transform: scale(1.12); box-shadow: 0 0 0 3px rgba(255,191,105,.34), 0 0 20px rgba(255,191,105,.5); }
+    .cell-marker.is-incorrect { background: radial-gradient(circle at 35% 30%, #ffbbc0, var(--red) 76%); color: #310b12; box-shadow: 0 0 0 3px rgba(255,119,130,.18), 0 0 22px rgba(255,119,130,.55); animation: shake .28s linear; }
+    .cell-marker.is-incorrect::after { content: '×'; font-size: 1rem; }
+    .cell-marker.is-incorrect .marker-note { display: none; }
+    .marker-note { pointer-events: none; }
+    .connections { position: absolute; inset: 18px 18px 20px 18px; z-index: 1; overflow: visible; pointer-events: none; }
+    .connection-line { fill: none; stroke: #8baac2; stroke-width: 1.55; stroke-dasharray: 7 7; stroke-linecap: round; opacity: .72; animation: dash 17s linear infinite; }
+    .connection-line.is-found { stroke: var(--green); opacity: .48; }
+    @keyframes dash { to { stroke-dashoffset: -140; } }
+    @keyframes shake { 0%,100% { transform: translateX(0); } 35% { transform: translateX(-3px); } 70% { transform: translateX(3px); } }
+    .board-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; color: var(--muted); font-size: .72rem; }
+    .board-footer strong { color: var(--text); }
+    .progress-track { width: 160px; height: 7px; overflow: hidden; border-radius: 99px; background: #23364e; }
+    .progress-fill { height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--green), #6ee7b7); transition: width .25s ease; }
+    .tip-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .tip-card { padding: 16px; border-radius: 16px; background: rgba(10, 21, 36, .68); border: 1px solid rgba(107, 147, 190, .18); }
+    .tip-card strong { display: block; margin-bottom: 6px; color: #dfefff; font-size: .82rem; }
+    .tip-card p { margin: 0; color: var(--muted); font-size: .75rem; line-height: 1.5; }
+    .footer-note { color: #657b94; font-size: .71rem; line-height: 1.5; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+    @media (max-width: 840px) {
+      .hero-title { max-width: 580px; }
+      .tip-grid { grid-template-columns: 1fr; }
+      .board-heading { align-items: flex-start; flex-direction: column; }
+      .legend { justify-content: flex-start; white-space: normal; }
+    }
+    @media (max-width: 600px) {
+      .app-shell { padding-top: 18px; }
+      .hero-copy { font-size: .9rem; }
+      .control-panel, .board-card { border-radius: 18px; }
+      .board-canvas { --cell-width: 50px; min-width: 910px; padding: 14px 14px 17px; }
+      .fret-grid { grid-template-columns: 70px repeat(16, 50px); grid-template-rows: 31px repeat(6, 53px); }
+      .connections { inset: 14px 14px 17px; }
+      .cell-marker { width: 37px; height: 37px; font-size: .65rem; }
+      .rule-box { font-size: .76rem; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="mb-7 md:mb-10">
+      <div class="eyebrow mb-3">Fretboard geometry lab</div>
+      <h1 class="hero-title">Find every octave<br /><span class="text-cyan-300">by shape.</span></h1>
+      <p class="hero-copy mt-5">Anchor a root on the lower four strings, then let the neck reveal the repeatable two-string octave pattern. Switch to practice when you are ready to trust your hands before your eyes.</p>
+    </header>
+
+    <section class="grid gap-5 lg:grid-cols-[minmax(280px,350px)_minmax(0,1fr)] items-start">
+      <aside class="glass-panel control-panel" aria-label="Octave controls">
+        <div class="panel-kicker mb-5">01 · Set your anchor</div>
+        <div class="grid gap-4">
+          <div>
+            <label class="field-label" for="rootSelect">Select Root Note Anchor</label>
+            <div class="select-wrap">
+              <select id="rootSelect" class="control-select" aria-describedby="modeHelp"></select>
+            </div>
+          </div>
+          <div>
+            <label class="field-label" for="stringSelect">Anchor Lowest Base String</label>
+            <div class="select-wrap">
+              <select id="stringSelect" class="control-select"></select>
+            </div>
+          </div>
+          <div>
+            <div class="field-label">Training mode</div>
+            <div class="mode-toggle" role="group" aria-label="Training mode">
+              <button id="exploreBtn" class="mode-btn" type="button" aria-pressed="true">Explore</button>
+              <button id="practiceBtn" class="mode-btn" type="button" aria-pressed="false">Practice</button>
+            </div>
+            <p id="modeHelp" class="sr-only">Explore shows every octave. Practice hides the answers until you tap a fret.</p>
+          </div>
+        </div>
+
+        <div class="rule-box mt-5" aria-live="polite">
+          <div class="rule-icon" aria-hidden="true">↗</div>
+          <p id="ruleText" class="m-0"></p>
+        </div>
+
+        <div id="practiceBox" class="practice-box mt-5" aria-live="polite">
+          <div class="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <div class="panel-kicker">Practice score</div>
+              <div class="text-xs text-slate-400 mt-1">Tap every hidden octave in the round.</div>
+            </div>
+            <div class="score-chip"><span id="scoreNumber" class="score-number">0</span><span class="score-label">correct</span></div>
+          </div>
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <div class="rounded-xl border border-slate-700/60 bg-slate-950/30 p-3"><div class="text-[.68rem] uppercase tracking-[.12em] text-slate-500">Rounds</div><div id="roundsNumber" class="mt-1 text-lg font-extrabold text-slate-100">0</div></div>
+            <div class="rounded-xl border border-slate-700/60 bg-slate-950/30 p-3"><div class="text-[.68rem] uppercase tracking-[.12em] text-slate-500">Accuracy</div><div id="accuracyNumber" class="mt-1 text-lg font-extrabold text-slate-100">—</div></div>
+          </div>
+          <button id="newRoundBtn" class="round-btn" type="button">Start new round</button>
+          <div id="practiceStatus" class="status-line mt-3" role="status"></div>
+        </div>
+      </aside>
+
+      <section class="glass-panel board-card" aria-label="Interactive guitar fretboard">
+        <div class="board-heading">
+          <div>
+            <div class="panel-kicker mb-2">02 · Map the neck</div>
+            <h2 class="board-title">Standard tuning · E A D G B E</h2>
+            <p class="board-subtitle mt-1">Frets 0–15 · click a fret to make its note the root · scroll on a small screen</p>
+          </div>
+          <div class="legend" aria-label="Fretboard legend">
+            <span class="legend-item"><i class="legend-dot anchor" aria-hidden="true"></i>Anchor root</span>
+            <span class="legend-item"><i class="legend-dot octave" aria-hidden="true"></i>Octave</span>
+            <span class="legend-item"><i class="legend-line" aria-hidden="true"></i>Shape ray</span>
+          </div>
+        </div>
+        <div id="boardScroll" class="board-scroll">
+          <div id="boardCanvas" class="board-canvas">
+            <svg id="connections" class="connections" aria-hidden="true"></svg>
+            <div id="fretGrid" class="fret-grid"></div>
+          </div>
+        </div>
+        <div class="board-footer">
+          <div id="boardSummary"><strong>Anchor:</strong> —</div>
+          <div id="practiceProgress" class="hidden items-center gap-3"><span id="progressLabel">0 / 0 found</span><span class="progress-track"><span id="progressFill" class="progress-fill"></span></span></div>
+        </div>
+      </section>
+    </section>
+
+    <section class="glass-panel mt-5 p-5 md:p-6" aria-label="Practice cues">
+      <div class="panel-kicker mb-4">03 · Build the reflex</div>
+      <div class="tip-grid">
+        <article class="tip-card"><strong>Two strings toward the floor</strong><p>On the 6th, 5th, 4th, and 3rd strings, an octave lives two string positions closer to the floor.</p></article>
+        <article class="tip-card"><strong>Mind the B string shift</strong><p>Crossing the G-to-B tuning interval adds one fret: use +3 frets from strings 3 or 4.</p></article>
+        <article class="tip-card"><strong>Say it, then play it</strong><p>Name the root and the string pair aloud. The shape becomes a movable physical sentence.</p></article>
+      </div>
+      <p class="footer-note mt-5">Notes are calculated from standard tuning in semitones, so every marker stays musically accurate across the full neck.</p>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+      const STRING_DEFS = [
+        { number: 1, name: 'E', pitchClass: 4, label: '1st · high E' },
+        { number: 2, name: 'B', pitchClass: 11, label: '2nd · B' },
+        { number: 3, name: 'G', pitchClass: 7, label: '3rd · G' },
+        { number: 4, name: 'D', pitchClass: 2, label: '4th · D' },
+        { number: 5, name: 'A', pitchClass: 9, label: '5th · A' },
+        { number: 6, name: 'E', pitchClass: 4, label: '6th · low E' }
+      ];
+      const ANCHOR_STRINGS = [5, 4, 3, 2];
+      const MAX_FRET = 15;
+      const fretGrid = document.getElementById('fretGrid');
+      const boardCanvas = document.getElementById('boardCanvas');
+      const connections = document.getElementById('connections');
+      const boardSummary = document.getElementById('boardSummary');
+      const rootSelect = document.getElementById('rootSelect');
+      const stringSelect = document.getElementById('stringSelect');
+      const ruleText = document.getElementById('ruleText');
+      const exploreBtn = document.getElementById('exploreBtn');
+      const practiceBtn = document.getElementById('practiceBtn');
+      const practiceBox = document.getElementById('practiceBox');
+      const newRoundBtn = document.getElementById('newRoundBtn');
+      const practiceStatus = document.getElementById('practiceStatus');
+      const scoreNumber = document.getElementById('scoreNumber');
+      const roundsNumber = document.getElementById('roundsNumber');
+      const accuracyNumber = document.getElementById('accuracyNumber');
+      const practiceProgress = document.getElementById('practiceProgress');
+      const progressLabel = document.getElementById('progressLabel');
+      const progressFill = document.getElementById('progressFill');
+
+      const state = {
+        mode: 'explore',
+        rootPc: 0,
+        anchorString: 5,
+        anchorFret: 0,
+        selectedKey: null,
+        practice: { targets: new Set(), found: new Set(), wrong: 0, score: 0, attempts: 0, rounds: 0, complete: false, flashKey: null, flashTimer: null }
+      };
+
+      function noteAt(stringIndex, fret) {
+        return (STRING_DEFS[stringIndex].pitchClass + fret) % 12;
+      }
+
+      function cellKey(stringIndex, fret) {
+        return `${stringIndex}-${fret}`;
+      }
+
+      function parseCellKey(key) {
+        const [stringIndex, fret] = key.split('-').map(Number);
+        return { stringIndex, fret };
+      }
+
+      function firstMatchingFret(stringIndex, pitchClass) {
+        for (let fret = 0; fret <= MAX_FRET; fret += 1) {
+          if (noteAt(stringIndex, fret) === pitchClass) return fret;
+        }
+        return 0;
+      }
+
+      function targetKeysFor(pitchClass, anchorKey) {
+        const keys = [];
+        for (let stringIndex = 0; stringIndex < STRING_DEFS.length; stringIndex += 1) {
+          for (let fret = 0; fret <= MAX_FRET; fret += 1) {
+            const key = cellKey(stringIndex, fret);
+            if (noteAt(stringIndex, fret) === pitchClass && key !== anchorKey) keys.push(key);
+          }
+        }
+        return keys;
+      }
+
+      function setMode(mode) {
+        if (state.mode === mode) return;
+        state.mode = mode;
+        exploreBtn.setAttribute('aria-pressed', String(mode === 'explore'));
+        practiceBtn.setAttribute('aria-pressed', String(mode === 'practice'));
+        practiceBox.classList.toggle('is-visible', mode === 'practice');
+        practiceProgress.classList.toggle('hidden', mode !== 'practice');
+        practiceProgress.classList.toggle('flex', mode === 'practice');
+        if (mode === 'practice') {
+          state.practice.complete = false;
+          startPracticeRound();
+        } else {
+          state.selectedKey = null;
+          render();
+        }
+      }
+
+      function updateRule() {
+        const stringNumber = STRING_DEFS[state.anchorString].number;
+        ruleText.textContent = (stringNumber === 6 || stringNumber === 5)
+          ? 'Geometric Rule: From the 5th/6th strings, octaves are found exactly two strings up (closer to the floor) and two frets higher.'
+          : 'Geometric Rule: From the 3rd/4th strings, due to the physical B-string tuning shift interval, octaves are found exactly two strings up (closer to the floor) and three frets higher.';
+      }
+
+      function updateStats() {
+        const practice = state.practice;
+        scoreNumber.textContent = String(practice.score);
+        roundsNumber.textContent = String(practice.rounds);
+        accuracyNumber.textContent = practice.attempts ? `${Math.round((practice.score / practice.attempts) * 100)}%` : '—';
+        const total = practice.targets.size;
+        const found = practice.found.size;
+        progressLabel.textContent = `${found} / ${total} found`;
+        progressFill.style.width = total ? `${(found / total) * 100}%` : '0%';
+      }
+
+      function makeOption(value, text, selected = false) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = text;
+        option.selected = selected;
+        return option;
+      }
+
+      function populateControls() {
+        NOTE_NAMES.forEach((note, index) => rootSelect.appendChild(makeOption(String(index), note, index === state.rootPc)));
+        ANCHOR_STRINGS.forEach((stringIndex) => {
+          const def = STRING_DEFS[stringIndex];
+          stringSelect.appendChild(makeOption(String(stringIndex), `String ${def.number} (${def.name})`, stringIndex === state.anchorString));
+        });
+      }
+
+      function buildGrid() {
+        fretGrid.replaceChildren();
+        const corner = document.createElement('div');
+        corner.className = 'grid-corner';
+        corner.textContent = 'String';
+        fretGrid.appendChild(corner);
+        for (let fret = 0; fret <= MAX_FRET; fret += 1) {
+          const head = document.createElement('div');
+          head.className = 'fret-head';
+          head.textContent = String(fret);
+          if ([3, 5, 7, 9, 15].includes(fret)) head.dataset.marker = 'single';
+          if (fret === 12) head.dataset.marker = 'double';
+          fretGrid.appendChild(head);
+        }
+        STRING_DEFS.forEach((def, stringIndex) => {
+          const label = document.createElement('div');
+          label.className = 'string-label';
+          label.innerHTML = `<span>${def.name}</span><small>${def.number}</small>`;
+          fretGrid.appendChild(label);
+          for (let fret = 0; fret <= MAX_FRET; fret += 1) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'fret-cell';
+            button.dataset.string = String(stringIndex);
+            button.dataset.fret = String(fret);
+            button.dataset.key = cellKey(stringIndex, fret);
+            button.addEventListener('click', onCellClick);
+            fretGrid.appendChild(button);
+          }
+        });
+      }
+
+      function renderCells(anchorKey, targetKeys) {
+        const targetSet = new Set(targetKeys);
+        const practice = state.practice;
+        document.querySelectorAll('.fret-cell').forEach((cell) => {
+          const stringIndex = Number(cell.dataset.string);
+          const fret = Number(cell.dataset.fret);
+          const key = cell.dataset.key;
+          const pitchClass = noteAt(stringIndex, fret);
+          const note = NOTE_NAMES[pitchClass];
+          cell.replaceChildren();
+          cell.removeAttribute('aria-current');
+          cell.classList.remove('is-anchor', 'is-octave', 'is-found', 'is-selected');
+          const marker = document.createElement('span');
+          marker.className = 'cell-marker';
+          marker.innerHTML = `<span class="marker-note">${note}</span>`;
+          if (key === anchorKey) {
+            marker.classList.add('is-anchor');
+            cell.setAttribute('aria-current', 'true');
+          } else if (state.mode === 'explore' && targetSet.has(key)) {
+            marker.classList.add('is-octave');
+          } else if (state.mode === 'practice' && practice.found.has(key)) {
+            marker.classList.add('is-found');
+          } else {
+            marker.classList.add('sr-only');
+          }
+          if (state.selectedKey === key && state.mode === 'explore') marker.classList.add('is-selected');
+          if (practice.flashKey === key && state.mode === 'practice') {
+            marker.classList.remove('sr-only');
+            marker.classList.add('is-incorrect');
+          }
+          cell.appendChild(marker);
+          cell.setAttribute('aria-label', `String ${STRING_DEFS[stringIndex].number}, fret ${fret}, note ${note}${key === anchorKey ? ', anchor root' : (targetSet.has(key) ? ', octave' : '')}`);
+        });
+      }
+
+      function renderConnections(anchorKey, targetKeys) {
+        connections.replaceChildren();
+        if (state.mode !== 'explore') return;
+        const anchorCell = document.querySelector(`[data-key="${anchorKey}"]`);
+        if (!anchorCell) return;
+        const canvasRect = boardCanvas.getBoundingClientRect();
+        const width = boardCanvas.clientWidth;
+        const height = boardCanvas.clientHeight;
+        connections.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        connections.setAttribute('width', String(width));
+        connections.setAttribute('height', String(height));
+        const center = (cell) => ({ x: cell.offsetLeft + cell.offsetWidth / 2, y: cell.offsetTop + cell.offsetHeight / 2 });
+        const from = center(anchorCell);
+        targetKeys.forEach((key) => {
+          const cell = document.querySelector(`[data-key="${key}"]`);
+          if (!cell) return;
+          const to = center(cell);
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', String(from.x));
+          line.setAttribute('y1', String(from.y));
+          line.setAttribute('x2', String(to.x));
+          line.setAttribute('y2', String(to.y));
+          line.classList.add('connection-line');
+          connections.appendChild(line);
+        });
+        void canvasRect;
+      }
+
+      function render() {
+        state.anchorFret = firstMatchingFret(state.anchorString, state.rootPc);
+        const anchorKey = cellKey(state.anchorString, state.anchorFret);
+        const targetKeys = targetKeysFor(state.rootPc, anchorKey);
+        renderCells(anchorKey, targetKeys);
+        renderConnections(anchorKey, targetKeys);
+        const anchorDef = STRING_DEFS[state.anchorString];
+        boardSummary.innerHTML = `<strong>Anchor:</strong> ${NOTE_NAMES[state.rootPc]} on String ${anchorDef.number} (${anchorDef.name}), fret ${state.anchorFret} · <strong>${targetKeys.length}</strong> octave positions`;
+        if (state.mode === 'practice') updateStats();
+        requestAnimationFrame(() => renderConnections(anchorKey, targetKeys));
+      }
+
+      function startPracticeRound() {
+        const randomRoot = Math.floor(Math.random() * NOTE_NAMES.length);
+        const randomString = ANCHOR_STRINGS[Math.floor(Math.random() * ANCHOR_STRINGS.length)];
+        state.rootPc = randomRoot;
+        state.anchorString = randomString;
+        rootSelect.value = String(randomRoot);
+        stringSelect.value = String(randomString);
+        state.anchorFret = firstMatchingFret(randomString, randomRoot);
+        const anchorKey = cellKey(randomString, state.anchorFret);
+        state.practice.targets = new Set(targetKeysFor(randomRoot, anchorKey));
+        state.practice.found = new Set();
+        state.practice.complete = false;
+        state.practice.flashKey = null;
+        practiceStatus.textContent = `Find ${state.practice.targets.size} octave positions for ${NOTE_NAMES[randomRoot]}.`;
+        practiceStatus.dataset.tone = 'info';
+        updateRule();
+        render();
+      }
+
+      function finishPracticeRound() {
+        if (state.practice.complete) return;
+        state.practice.complete = true;
+        state.practice.rounds += 1;
+        practiceStatus.textContent = `Round complete — ${NOTE_NAMES[state.rootPc]} octaves all found. Ready for another?`;
+        practiceStatus.dataset.tone = 'good';
+        newRoundBtn.textContent = 'Start next round';
+        updateStats();
+      }
+
+      function onCellClick(event) {
+        const cell = event.currentTarget;
+        const key = cell.dataset.key;
+        const stringIndex = Number(cell.dataset.string);
+        const fret = Number(cell.dataset.fret);
+        const note = NOTE_NAMES[noteAt(stringIndex, fret)];
+        const anchorKey = cellKey(state.anchorString, state.anchorFret);
+        if (state.mode === 'explore') {
+          const clickedPitchClass = noteAt(stringIndex, fret);
+          state.rootPc = clickedPitchClass;
+          rootSelect.value = String(clickedPitchClass);
+          if (ANCHOR_STRINGS.includes(stringIndex)) {
+            state.anchorString = stringIndex;
+            stringSelect.value = String(stringIndex);
+          }
+          state.selectedKey = key;
+          const stringMessage = ANCHOR_STRINGS.includes(stringIndex)
+            ? ` · String ${STRING_DEFS[stringIndex].number} is now the anchor`
+            : '';
+          practiceStatus.textContent = `Root changed to ${note} from String ${STRING_DEFS[stringIndex].number}, fret ${fret}${stringMessage}.`;
+          practiceStatus.dataset.tone = 'good';
+          render();
+          return;
+        }
+        if (state.practice.complete) return;
+        state.practice.attempts += 1;
+        if (key !== anchorKey && state.practice.targets.has(key)) {
+          if (!state.practice.found.has(key)) {
+            state.practice.found.add(key);
+            state.practice.score += 1;
+            practiceStatus.textContent = `Correct — ${note} is an octave. ${state.practice.targets.size - state.practice.found.size} left.`;
+            practiceStatus.dataset.tone = 'good';
+          } else {
+            practiceStatus.textContent = 'You already found that octave. Keep scanning the neck.';
+            practiceStatus.dataset.tone = 'info';
+          }
+          if (state.practice.found.size === state.practice.targets.size) finishPracticeRound();
+        } else {
+          state.practice.wrong += 1;
+          state.practice.flashKey = key;
+          practiceStatus.textContent = key === anchorKey ? 'That is the anchor root. Look for the matching pitch elsewhere.' : `${note} is not ${NOTE_NAMES[state.rootPc]}. Try the two-string shape.`;
+          practiceStatus.dataset.tone = 'bad';
+          clearTimeout(state.practice.flashTimer);
+          state.practice.flashTimer = setTimeout(() => { state.practice.flashKey = null; render(); }, 520);
+        }
+        render();
+      }
+
+      rootSelect.addEventListener('change', () => {
+        state.rootPc = Number(rootSelect.value);
+        state.selectedKey = null;
+        if (state.mode === 'practice') {
+          state.practice.complete = false;
+          state.practice.found = new Set();
+          state.practice.targets = new Set(targetKeysFor(state.rootPc, cellKey(state.anchorString, firstMatchingFret(state.anchorString, state.rootPc))));
+          practiceStatus.textContent = `Practice anchor changed to ${NOTE_NAMES[state.rootPc]}. Find the hidden octaves.`;
+          practiceStatus.dataset.tone = 'info';
+        }
+        updateRule();
+        render();
+      });
+
+      stringSelect.addEventListener('change', () => {
+        state.anchorString = Number(stringSelect.value);
+        state.selectedKey = null;
+        if (state.mode === 'practice') {
+          state.practice.complete = false;
+          state.practice.found = new Set();
+          state.practice.targets = new Set(targetKeysFor(state.rootPc, cellKey(state.anchorString, firstMatchingFret(state.anchorString, state.rootPc))));
+          practiceStatus.textContent = `Practice anchor moved to String ${STRING_DEFS[state.anchorString].number}. Find the hidden octaves.`;
+          practiceStatus.dataset.tone = 'info';
+        }
+        updateRule();
+        render();
+      });
+
+      exploreBtn.addEventListener('click', () => setMode('explore'));
+      practiceBtn.addEventListener('click', () => setMode('practice'));
+      newRoundBtn.addEventListener('click', startPracticeRound);
+      window.addEventListener('resize', () => {
+        const anchorKey = cellKey(state.anchorString, state.anchorFret);
+        const targetKeys = targetKeysFor(state.rootPc, anchorKey);
+        requestAnimationFrame(() => renderConnections(anchorKey, targetKeys));
+      });
+
+      populateControls();
+      buildGrid();
+      updateRule();
+      render();
+    })();
+  </script>
+</body>
+</html>
